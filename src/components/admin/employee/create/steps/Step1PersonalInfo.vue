@@ -343,7 +343,7 @@ const deletePhoto = () => {
                 </div>
               </label>
 
-              <!-- Female Option -->
+              <!-- Felaki-laki Option -->
               <label
                 class="group card flex items-center justify-between w-full min-h-[60px] rounded-[16px] border border-[#DCDEDD] p-4 has-[:checked]:ring-2 has-[:checked]:ring-[#0C51D9] has-[:checked]:ring-offset-2 transition-all duration-300 cursor-pointer"
               >
