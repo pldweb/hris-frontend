@@ -1,0 +1,843 @@
+<script setup>
+import { ref, onMounted, computed } from "vue";
+import {
+  CalendarCheck,
+  CalendarDays,
+  Clock,
+  Clock3,
+  Download,
+  Plus,
+  User,
+  CalendarPlus,
+  Eye,
+  CalendarX,
+} from "lucide-vue-next";
+import { useAttendanceStore } from "@/stores/attendance";
+import { useLeaveRequestStore } from "@/stores/leaveRequest";
+import { useOptionStore } from "@/stores/option";
+import { storeToRefs } from "pinia";
+
+// Utils
+import {
+  formatDateShort,
+  formatDateLong,
+  formatRequestDate,
+  formatRequestDateLong,
+  getDayName,
+  formatTime,
+  calculateWorkingHours,
+  calculateWorkingDays,
+} from "@/utils/dateUtils";
+import { getStatusConfig, formatLeaveType } from "@/utils/attendanceUtils";
+import AttendanceStatsCards from "@/components/employee/attendance/AttendanceStatsCards.vue";
+import LeaveRequestSuccessModal from "@/components/employee/attendance/LeaveRequestSuccessModal.vue";
+
+const attendanceStore = useAttendanceStore();
+const { loading: attendanceLoading, attendances, statistics } = storeToRefs(attendanceStore);
+const { fetchAttendances, fetchStatistics } = attendanceStore;
+
+const leaveRequestStore = useLeaveRequestStore();
+const { loading: leaveLoading, myLeaveRequests } = storeToRefs(leaveRequestStore);
+const { fetchMyLeaveRequests, createLeaveRequest } = leaveRequestStore;
+
+const optionStore = useOptionStore();
+const { leaveTypes } = storeToRefs(optionStore);
+const { fetchLeaveTypes } = optionStore;
+
+// State
+const showLeaveRequestModal = ref(false);
+const showLeaveDetailsModal = ref(false);
+const showSuccessModal = ref(false);
+const selectedLeaveRequest = ref(null);
+const submittedLeaveData = ref(null);
+const leaveForm = ref({
+  leave_type: "",
+  start_date: "",
+  end_date: "",
+  reason: "",
+  emergency_contact: "",
+});
+
+// Computed
+const recentAttendances = computed(() => {
+  return attendances.value.slice(0, 7);
+});
+
+const totalDaysCalculated = computed(() => {
+  if (!leaveForm.value.start_date || !leaveForm.value.end_date) {
+    return 0;
+  }
+  return calculateWorkingDays(
+    leaveForm.value.start_date,
+    leaveForm.value.end_date
+  );
+});
+
+const pendingRequestsCount = computed(() => {
+  return myLeaveRequests.value.filter((r) => r.status === "pending").length;
+});
+
+const openLeaveRequestModal = () => {
+  showLeaveRequestModal.value = true;
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  leaveForm.value.start_date = tomorrow.toISOString().split("T")[0];
+  leaveForm.value.end_date = tomorrow.toISOString().split("T")[0];
+};
+
+const closeLeaveRequestModal = () => {
+  showLeaveRequestModal.value = false;
+  leaveForm.value = {
+    leave_type: "",
+    start_date: "",
+    end_date: "",
+    reason: "",
+    emergency_contact: "",
+  };
+};
+
+const submitLeaveRequest = async () => {
+  const startDate = new Date(leaveForm.value.start_date);
+  const endDate = new Date(leaveForm.value.end_date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (startDate <= today) {
+    alert("Tanggal mulai harus minimal besok.");
+    return;
+  }
+
+  if (endDate < startDate) {
+    alert("Tanggal akhir harus setelah tanggal mulai.");
+    return;
+  }
+
+  const totalDays = totalDaysCalculated.value;
+
+  try {
+    await createLeaveRequest({
+      ...leaveForm.value,
+      total_days: totalDays,
+    });
+
+    submittedLeaveData.value = {
+      leave_type: leaveForm.value.leave_type,
+      start_date: leaveForm.value.start_date,
+      end_date: leaveForm.value.end_date,
+      total_days: totalDays,
+    };
+    showSuccessModal.value = true;
+
+    closeLeaveRequestModal();
+    await fetchMyLeaveRequests();
+  } catch (error) {
+    console.error("Failed to submit leave request:", error);
+    alert("Gagal mengirimkan permintaan cuti. Silakan coba lagi.");
+  }
+};
+
+const closeSuccessModal = () => {
+  showSuccessModal.value = false;
+  submittedLeaveData.value = null;
+};
+
+const openLeaveDetailsModal = (requestId) => {
+  const request = myLeaveRequests.value.find((r) => r.id === requestId);
+  if (!request) return;
+  selectedLeaveRequest.value = request;
+  showLeaveDetailsModal.value = true;
+};
+
+const closeLeaveDetailsModal = () => {
+  showLeaveDetailsModal.value = false;
+  selectedLeaveRequest.value = null;
+};
+
+const updateEndDateMin = () => {
+  if (leaveForm.value.start_date && leaveForm.value.end_date) {
+    if (new Date(leaveForm.value.end_date) < new Date(leaveForm.value.start_date)) {
+      leaveForm.value.end_date = leaveForm.value.start_date;
+    }
+  }
+};
+
+// Lifecycle
+onMounted(async () => {
+  await Promise.all([
+    fetchAttendances(),
+    fetchStatistics(),
+    fetchMyLeaveRequests(),
+    fetchLeaveTypes()
+  ]);
+});
+</script>
+
+<template>
+  <div class="p-5">
+    <!-- Banner Section -->
+    <div
+      class="relative rounded-[20px] mb-6 overflow-hidden h-[200px]"
+      style="
+        background-image: url('https://images.unsplash.com/photo-1497366216548-37526070297c');
+        background-size: cover;
+        background-position: center;
+      "
+    >
+      <!-- Dark Overlay -->
+      <div class="absolute inset-0 bg-black/40"></div>
+
+      <!-- Banner Content -->
+      <div class="relative z-10 p-6 h-full flex flex-col justify-center">
+        <div class="flex items-center gap-4">
+          <div
+            class="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-[16px] flex items-center justify-center"
+          >
+            <CalendarCheck class="w-8 h-8 text-white" />
+          </div>
+          <div>
+            <h3 class="text-white text-2xl font-bold">Ringkasan Kehadiran</h3>
+            <p class="text-white/90 text-base font-normal">
+              Lacak kehadiran harian Anda dan kelola permintaan cuti secara efisien
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Overlapped Action Buttons -->
+      <div class="absolute bottom-4 right-6 flex items-center gap-[10px] z-20">
+        <button
+          class="border border-[#DCDEDD] bg-white rounded-[8px] hover:border-[#0C51D9] hover:border-2 hover:bg-gray-50 transition-all duration-300 px-4 py-3 flex items-center gap-2 shadow-lg"
+        >
+          <Download class="w-4 h-4 text-gray-600" />
+          <span class="text-brand-dark text-sm font-semibold"
+            >Ekspor Laporan</span
+          >
+        </button>
+
+        <button
+          @click="openLeaveRequestModal"
+          class="btn-primary rounded-[8px] border border-[#2151A0] hover:brightness-110 focus:ring-2 focus:ring-[#0C51D9] transition-all duration-300 blue-gradient blue-btn-shadow px-4 py-3 flex items-center gap-2 shadow-lg"
+        >
+          <Plus class="w-4 h-4 text-white" />
+          <span class="text-white text-sm font-semibold">Ajukan Cuti</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <AttendanceStatsCards
+      :statistics="statistics"
+      :pending-requests-count="pendingRequestsCount"
+    />
+
+    <!-- Content Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Recent Attendance -->
+      <div
+        class="bg-white border border-[#DCDEDD] rounded-[20px] hover:border-[#0C51D9] hover:border-2 transition-all duration-300 p-6"
+      >
+        <div class="flex items-center justify-between mb-6">
+          <div class="flex items-center gap-3">
+            <div
+              class="w-12 h-12 bg-green-50 rounded-[12px] flex items-center justify-center"
+            >
+              <CalendarCheck class="w-6 h-6 text-green-600" />
+            </div>
+            <div>
+              <h3 class="text-brand-dark text-lg font-bold">
+                Kehadiran Terbaru
+              </h3>
+              <p class="text-brand-light text-sm">7 hari terakhir</p>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="loading" class="text-center py-8">
+          <p class="text-brand-light">Memuat...</p>
+        </div>
+
+        <div v-else class="space-y-3">
+          <div
+            v-for="record in recentAttendances"
+            :key="record.id"
+            class="border border-[#DCDEDD] rounded-[16px] hover:border-[#0C51D9] hover:border-2 hover:shadow-lg transition-all duration-300 p-4"
+          >
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-3">
+                <div
+                  class="w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-600 rounded-[12px] flex items-center justify-center"
+                >
+                  <User class="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h4 class="text-brand-dark text-sm font-semibold">
+                    {{ getDayName(record.date) }}
+                  </h4>
+                  <p class="text-brand-light text-sm">
+                    {{ formatDateShort(record.date) }}
+                  </p>
+                </div>
+              </div>
+              <span
+                :class="getStatusConfig(record.status).class"
+                class="px-2 py-1 rounded-md text-sm font-semibold"
+              >
+                {{ getStatusConfig(record.status).text }}
+              </span>
+            </div>
+
+            <div class="border-b border-[#DCDEDD] mb-3"></div>
+
+            <div v-if="record.check_in" class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-brand-dark text-sm font-medium"
+                  >Masuk</span
+                >
+                <span class="text-brand-dark text-sm font-semibold">{{
+                  formatTime(record.check_in)
+                }}</span>
+              </div>
+              <div v-if="record.check_out">
+                <div class="flex items-center justify-between">
+                  <span class="text-brand-dark text-sm font-medium"
+                    >Keluar</span
+                  >
+                  <span class="text-brand-dark text-sm font-semibold">{{
+                    formatTime(record.check_out)
+                  }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-brand-dark text-sm font-medium"
+                    >Total Jam Kerja</span
+                  >
+                  <span class="text-brand-dark text-sm font-semibold">{{
+                    calculateWorkingHours(record.check_in, record.check_out)
+                  }}</span>
+                </div>
+              </div>
+              <div v-else class="flex items-center justify-between">
+                <span class="text-brand-dark text-sm font-medium">Status</span>
+                <span
+                  class="text-green-600 text-sm font-semibold flex items-center gap-1"
+                >
+                  <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  Sedang Bekerja
+                </span>
+              </div>
+            </div>
+            <div v-else class="flex items-center justify-center py-2">
+              <span class="text-brand-light text-sm italic"
+                >Tidak ada data kehadiran</span
+              >
+            </div>
+          </div>
+
+          <div
+            v-if="!loading && recentAttendances.length === 0"
+            class="text-center py-8"
+          >
+            <p class="text-brand-light">Tidak ada catatan kehadiran yang ditemukan</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Leave Requests -->
+      <div
+        class="bg-white border border-[#DCDEDD] rounded-[20px] hover:border-[#0C51D9] hover:border-2 transition-all duration-300 p-6"
+      >
+        <div class="flex items-center justify-between mb-6">
+          <div class="flex items-center gap-3">
+            <div
+              class="w-12 h-12 bg-orange-50 rounded-[12px] flex items-center justify-center"
+            >
+              <CalendarX class="w-6 h-6 text-orange-600" />
+            </div>
+            <div>
+              <h3 class="text-brand-dark text-lg font-bold">
+                Permintaan Cuti Saya
+              </h3>
+              <p class="text-brand-light text-sm">Permintaan terbaru</p>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="leaveLoading" class="text-center py-8">
+          <p class="text-brand-light">Memuat...</p>
+        </div>
+
+        <div v-else class="space-y-4">
+          <div
+            v-for="request in myLeaveRequests"
+            :key="request.id"
+            class="border border-[#DCDEDD] rounded-[16px] hover:border-[#0C51D9] hover:border-2 hover:shadow-lg transition-all duration-300 p-4"
+          >
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-3">
+                <div
+                  class="w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-600 rounded-[12px] flex items-center justify-center"
+                >
+                  <CalendarPlus class="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h4 class="text-brand-dark text-sm font-semibold">
+                    {{ formatLeaveType(request.leave_type) }}
+                  </h4>
+                  <p class="text-brand-light text-sm">
+                    {{ request.total_days }} hari
+                  </p>
+                </div>
+              </div>
+              <span
+                :class="getStatusConfig(request.status).class"
+                class="px-2 py-1 rounded-md text-sm font-semibold"
+              >
+                {{ getStatusConfig(request.status).text }}
+              </span>
+            </div>
+
+            <div class="border-b border-[#DCDEDD] mb-3"></div>
+
+            <div class="space-y-2 mb-3">
+              <div class="flex items-center justify-between">
+                <span class="text-brand-dark text-sm font-medium"
+                  >Tanggal Mulai</span
+                >
+                <span class="text-brand-dark text-sm font-semibold">{{
+                  formatDateShort(request.start_date)
+                }}</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-brand-dark text-sm font-medium"
+                  >Tanggal Selesai</span
+                >
+                <span class="text-brand-dark text-sm font-semibold">{{
+                  formatDateShort(request.end_date)
+                }}</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-brand-dark text-sm font-medium"
+                  >Diajukan</span
+                >
+                <span class="text-brand-light text-sm">{{
+                  formatRequestDate(request.created_at)
+                }}</span>
+              </div>
+            </div>
+
+            <button
+              @click="openLeaveDetailsModal(request.id)"
+              class="w-full border border-[#DCDEDD] rounded-[8px] hover:border-[#0C51D9] hover:border-2 hover:bg-gray-50 transition-all duration-300 px-3 py-2 flex items-center justify-center gap-2"
+            >
+              <Eye class="w-4 h-4 text-gray-600" />
+              <span class="text-brand-dark text-sm font-semibold"
+                >Lihat Detail</span
+              >
+            </button>
+          </div>
+
+          <div
+            v-if="!leaveLoading && myLeaveRequests.length === 0"
+            class="text-center py-8"
+          >
+            <p class="text-brand-light">Tidak ada permintaan cuti yang ditemukan</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Leave Request Modal -->
+    <Teleport to="body">
+      <div
+        v-if="showLeaveRequestModal"
+        class="fixed inset-0 backdrop-blur-sm z-50 flex items-center justify-center"
+        @click.self="closeLeaveRequestModal"
+      >
+        <div
+          class="bg-white rounded-[20px] border border-[#DCDEDD] w-full max-w-3xl mx-4 max-h-[90vh] overflow-hidden"
+        >
+          <!-- Modal Header -->
+          <div class="p-6 border-b border-[#DCDEDD]">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div
+                  class="w-12 h-12 bg-blue-50 rounded-[12px] flex items-center justify-center"
+                >
+                  <CalendarPlus class="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 class="text-brand-dark text-xl font-bold">
+                    Ajukan Cuti Baru
+                  </h3>
+                  <p class="text-brand-light text-sm font-normal">
+                    Kirim permintaan cuti untuk disetujui
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                @click="closeLeaveRequestModal"
+                class="w-10 h-10 rounded-full border border-[#DCDEDD] flex items-center justify-center hover:border-[#0C51D9] hover:border-2 transition-all duration-200"
+              >
+                <span class="text-gray-600 text-xl">×</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Modal Content -->
+          <div class="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+            <form @submit.prevent="submitLeaveRequest" class="space-y-6">
+              <!-- Leave Information Section -->
+              <div
+                class="bg-white border border-[#DCDEDD] rounded-[20px] p-6"
+              >
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <!-- Leave Type -->
+                  <div class="md:col-span-2">
+                    <label
+                      class="block text-brand-dark text-base font-semibold mb-1"
+                      >Jenis Cuti *</label
+                    >
+                    <select
+                      v-model="leaveForm.leave_type"
+                      required
+                      class="w-full px-4 py-3 border border-[#DCDEDD] rounded-[16px] hover:border-[#0C51D9] hover:border-2 focus:border-[#0C51D9] focus:border-2 focus:bg-white transition-all duration-300 font-semibold"
+                    >
+                      <option value="">Pilih jenis cuti</option>
+                      <option
+                        v-for="type in leaveTypes"
+                        :key="type.value"
+                        :value="type.value"
+                      >
+                        {{ type.label }}
+                      </option>
+                    </select>
+                  </div>
+
+                  <!-- Start Date -->
+                  <div>
+                    <label
+                      class="block text-brand-dark text-base font-semibold mb-1"
+                      >Tanggal Mulai *</label
+                    >
+                    <input
+                      type="date"
+                      v-model="leaveForm.start_date"
+                      @change="updateEndDateMin"
+                      required
+                      class="w-full px-4 py-3 border border-[#DCDEDD] rounded-[16px] hover:border-[#0C51D9] hover:border-2 focus:border-[#0C51D9] focus:border-2 focus:bg-white transition-all duration-300 font-semibold"
+                    />
+                  </div>
+
+                  <!-- End Date -->
+                  <div>
+                    <label
+                      class="block text-brand-dark text-base font-semibold mb-1"
+                      >Tanggal Selesai *</label
+                    >
+                    <input
+                      type="date"
+                      v-model="leaveForm.end_date"
+                      :min="leaveForm.start_date"
+                      required
+                      class="w-full px-4 py-3 border border-[#DCDEDD] rounded-[16px] hover:border-[#0C51D9] hover:border-2 focus:border-[#0C51D9] focus:border-2 focus:bg-white transition-all duration-300 font-semibold"
+                    />
+                  </div>
+
+                  <!-- Total Days -->
+                  <div class="md:col-span-2">
+                    <label
+                      class="block text-brand-dark text-base font-semibold mb-1"
+                      >Total Hari</label
+                    >
+                    <div
+                      class="p-4 bg-gray-50 rounded-[12px] border border-[#DCDEDD]"
+                    >
+                      <div class="flex items-center gap-3">
+                        <div
+                          class="w-10 h-10 bg-blue-50 rounded-[12px] flex items-center justify-center"
+                        >
+                          <Clock class="w-5 h-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <p class="text-brand-dark text-lg font-bold">
+                            {{ totalDaysCalculated }}
+                            hari
+                          </p>
+                          <p class="text-brand-light text-sm">
+                            Tidak termasuk akhir pekan
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Reason Section -->
+              <div
+                class="bg-white border border-[#DCDEDD] rounded-[20px] p-6"
+              >
+                <div class="space-y-4">
+                  <!-- Reason -->
+                  <div>
+                    <label
+                      class="block text-brand-dark text-base font-semibold mb-1"
+                      >Alasan Cuti *</label
+                    >
+                    <textarea
+                      v-model="leaveForm.reason"
+                      required
+                      rows="4"
+                      class="w-full px-4 py-3 border border-[#DCDEDD] rounded-[16px] hover:border-[#0C51D9] hover:border-2 focus:border-[#0C51D9] focus:border-2 focus:bg-white transition-all duration-300 font-semibold resize-none"
+                      placeholder="Mohon berikan alasan rinci untuk permintaan cuti Anda..."
+                    ></textarea>
+                  </div>
+
+                  <!-- Emergency Contact -->
+                  <div>
+                    <label
+                      class="block text-brand-dark text-base font-semibold mb-1"
+                      >Kontak Darurat (Opsional)</label
+                    >
+                    <input
+                      type="tel"
+                      v-model="leaveForm.emergency_contact"
+                      class="w-full px-4 py-3 border border-[#DCDEDD] rounded-[16px] hover:border-[#0C51D9] hover:border-2 focus:border-[#0C51D9] focus:border-2 focus:bg-white transition-all duration-300 font-semibold"
+                      placeholder="Nomor telepon untuk kontak darurat"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Form Actions -->
+              <div class="flex items-center gap-4">
+                <button
+                  type="button"
+                  @click="closeLeaveRequestModal"
+                  class="border border-[#DCDEDD] rounded-[8px] hover:border-[#0C51D9] hover:border-2 hover:bg-gray-50 transition-all duration-300 px-6 py-3 flex items-center gap-2"
+                >
+                  <span class="text-brand-dark text-base font-semibold"
+                    >Batal</span
+                  >
+                </button>
+                <button
+                  type="submit"
+                  class="btn-primary rounded-[8px] border border-[#2151A0] hover:brightness-110 focus:ring-2 focus:ring-[#0C51D9] transition-all duration-300 blue-gradient blue-btn-shadow px-6 py-3 flex items-center gap-2"
+                >
+                  <span class="text-brand-white text-base font-semibold"
+                    >Kirim Permintaan</span
+                  >
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Leave Details Modal -->
+    <Teleport to="body">
+      <div
+        v-if="showLeaveDetailsModal && selectedLeaveRequest"
+        class="fixed inset-0 backdrop-blur-sm z-50 flex items-center justify-center"
+        @click.self="closeLeaveDetailsModal"
+      >
+        <div
+          class="bg-white rounded-[20px] border border-[#DCDEDD] w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden"
+        >
+          <!-- Modal Header -->
+          <div class="p-6 border-b border-[#DCDEDD]">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div
+                  class="w-12 h-12 bg-blue-50 rounded-[12px] flex items-center justify-center"
+                >
+                  <CalendarCheck class="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 class="text-brand-dark text-xl font-bold">
+                    Detail Permintaan Cuti
+                  </h3>
+                  <p class="text-brand-light text-sm font-normal">
+                    Informasi lengkap mengenai permintaan cuti ini
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                @click="closeLeaveDetailsModal"
+                class="w-10 h-10 rounded-full border border-[#DCDEDD] flex items-center justify-center hover:border-[#0C51D9] hover:border-2 transition-all duration-200"
+              >
+                <span class="text-gray-600 text-xl">×</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Modal Content -->
+          <div class="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+            <div class="space-y-6">
+              <!-- Leave Information Section -->
+              <div
+                class="bg-white border border-[#DCDEDD] rounded-[20px] p-6"
+              >
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <!-- Leave Type -->
+                  <div>
+                    <label
+                      class="block text-brand-dark text-base font-semibold mb-2"
+                      >Jenis Cuti</label
+                    >
+                    <div
+                      class="p-3 bg-gray-50 rounded-[12px] border border-[#DCDEDD]"
+                    >
+                      <span class="text-brand-dark text-base font-medium">{{
+                        formatLeaveType(selectedLeaveRequest.leave_type)
+                      }}</span>
+                    </div>
+                  </div>
+
+                  <!-- Status -->
+                  <div>
+                    <label
+                      class="block text-brand-dark text-base font-semibold mb-2"
+                      >Status</label
+                    >
+                    <div
+                      class="p-3 bg-gray-50 rounded-[12px] border border-[#DCDEDD]"
+                    >
+                      <span
+                        :class="
+                          getStatusConfig(selectedLeaveRequest.status).class
+                        "
+                        class="text-base font-semibold"
+                      >
+                        {{
+                          getStatusConfig(selectedLeaveRequest.status).text
+                        }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Start Date -->
+                  <div>
+                    <label
+                      class="block text-brand-dark text-base font-semibold mb-2"
+                      >Tanggal Mulai</label
+                    >
+                    <div
+                      class="p-3 bg-gray-50 rounded-[12px] border border-[#DCDEDD]"
+                    >
+                      <span class="text-brand-dark text-base font-medium">{{
+                        formatDateLong(selectedLeaveRequest.start_date)
+                      }}</span>
+                    </div>
+                  </div>
+
+                  <!-- End Date -->
+                  <div>
+                    <label
+                      class="block text-brand-dark text-base font-semibold mb-2"
+                      >Tanggal Selesai</label
+                    >
+                    <div
+                      class="p-3 bg-gray-50 rounded-[12px] border border-[#DCDEDD]"
+                    >
+                      <span class="text-brand-dark text-base font-medium">{{
+                        formatDateLong(selectedLeaveRequest.end_date)
+                      }}</span>
+                    </div>
+                  </div>
+
+                  <!-- Total Days -->
+                  <div class="md:col-span-2">
+                    <label
+                      class="block text-brand-dark text-base font-semibold mb-2"
+                      >Total Durasi</label
+                    >
+                    <div
+                      class="p-4 bg-blue-50 rounded-[12px] border border-[#DCDEDD]"
+                    >
+                      <div class="flex items-center gap-3">
+                        <div
+                          class="w-10 h-10 bg-blue-100 rounded-[12px] flex items-center justify-center"
+                        >
+                          <Clock class="w-5 h-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <p class="text-brand-dark text-lg font-bold">
+                            {{ selectedLeaveRequest.total_days }}
+                            hari
+                          </p>
+                          <p class="text-brand-light text-sm">
+                            Hari kerja (tidak termasuk akhir pekan)
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Reason Section -->
+              <div
+                class="bg-white border border-[#DCDEDD] rounded-[20px] p-6"
+              >
+                <div class="space-y-4">
+                  <!-- Reason -->
+                  <div>
+                    <label
+                      class="block text-brand-dark text-base font-semibold mb-2"
+                      >Alasan Cuti</label
+                    >
+                    <div
+                      class="p-4 bg-gray-50 rounded-[12px] border border-[#DCDEDD] min-h-[100px]"
+                    >
+                      <p class="text-brand-dark text-base leading-relaxed">
+                        {{ selectedLeaveRequest.reason }}
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- Request Date -->
+                  <div>
+                    <label
+                      class="block text-brand-dark text-base font-semibold mb-2"
+                      >Permintaan Dikirim</label
+                    >
+                    <div
+                      class="p-3 bg-gray-50 rounded-[12px] border border-[#DCDEDD]"
+                    >
+                      <span class="text-brand-dark text-base font-medium">{{
+                        formatRequestDateLong(selectedLeaveRequest.created_at)
+                      }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="flex items-center justify-end gap-4">
+                <button
+                  type="button"
+                  @click="closeLeaveDetailsModal"
+                  class="border border-[#DCDEDD] rounded-[8px] hover:border-[#0C51D9] hover:border-2 hover:bg-gray-50 transition-all duration-300 px-6 py-3 flex items-center gap-2"
+                >
+                  <span class="text-brand-dark text-base font-semibold"
+                    >Tutup</span
+                  >
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Success Modal -->
+    <LeaveRequestSuccessModal
+      :show="showSuccessModal"
+      :leave-data="submittedLeaveData"
+      @close="closeSuccessModal"
+    />
+  </div>
+</template>
