@@ -330,7 +330,7 @@ const deletePhoto = () => {
                   <input
                     type="radio"
                     name="gender"
-                    value="laki-laki"
+                    value="Laki-laki"
                     class="hidden"
                     v-model="form.gender"
                   />
@@ -363,7 +363,7 @@ const deletePhoto = () => {
                   <input
                     type="radio"
                     name="gender"
-                    value="perempuan"
+                    value="Perempuan"
                     class="hidden"
                     v-model="form.gender"
                   />
