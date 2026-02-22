@@ -163,7 +163,7 @@ const handleLogout = async () => {
       <div class="flex items-center gap-4">
         <!-- Action Buttons -->
         <div class="hidden sm:flex items-center gap-3">
-          <button
+          <!-- <button
             class="w-10 h-10 rounded-full border border-[#DCDEDD] flex items-center justify-center hover:border-[#0C51D9] hover:border-2 transition-all duration-200"
           >
             <BellIcon class="w-5 h-5 text-gray-600" />
@@ -177,7 +177,7 @@ const handleLogout = async () => {
             class="w-10 h-10 rounded-full border border-[#DCDEDD] flex items-center justify-center hover:border-[#0C51D9] hover:border-2 transition-all duration-200"
           >
             <SettingsIcon class="w-5 h-5 text-gray-600" />
-          </button>
+          </button> -->
         </div>
 
         <!-- Divider -->

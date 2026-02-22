@@ -21,141 +21,136 @@ onMounted(() => {
   projectStore.fetchStatistics();
 });
 
-// Chart configuration
-const chartOptions = ref({
-  chart: {
-    type: "area",
-    height: 250,
-    toolbar: {
-      show: false,
+const chartOptions = computed(() => {
+  return {
+    chart: {
+      type: "area" as const,
+      height: 250,
+      toolbar: {
+        show: false,
+      },
+      sparkline: {
+        enabled: false,
+      },
+      animations: {
+        enabled: true,
+        easing: "easeinout",
+        speed: 800,
+      },
     },
-    sparkline: {
+    stroke: {
+      curve: "smooth",
+      width: 3,
+      colors: ["#8A63F9"],
+    },
+    fill: {
+      type: "gradient",
+      gradient: {
+        shadeIntensity: 1,
+        opacityFrom: 0.4,
+        opacityTo: 0.05,
+        stops: [0, 100],
+        colorStops: [
+          {
+            offset: 0,
+            color: "#8A63F9",
+            opacity: 0.4,
+          },
+          {
+            offset: 100,
+            color: "#8A63F9",
+            opacity: 0.05,
+          },
+        ],
+      },
+    },
+    colors: ["#8A63F9"],
+    grid: {
+      borderColor: "#f1f1f1",
+      strokeDashArray: 0,
+      padding: {
+        top: 20,
+        right: 20,
+        bottom: 20,
+        left: 20,
+      },
+    },
+    xaxis: {
+      categories: projectStore.statistics?.chart_data?.categories || [],
+      axisBorder: {
+        show: false,
+      },
+      axisTicks: {
+        show: false,
+      },
+      labels: {
+        style: {
+          colors: "#6B7280",
+          fontSize: "12px",
+        },
+      },
+    },
+    yaxis: {
+      min: 0,
+      tickAmount: 4, // More dynamic max/min calculation based on data naturally
+      labels: {
+        style: {
+          colors: "#6B7280",
+          fontSize: "12px",
+        },
+        formatter: (value: number) => `${Math.floor(value)}`,
+      },
+    },
+    tooltip: {
+      enabled: true,
+      style: {
+        fontSize: "12px",
+      },
+      y: {
+        formatter: (value: number) => `${value}`,
+      },
+      theme: "light",
+      fillSeriesColor: false,
+    },
+    dataLabels: {
       enabled: false,
     },
-    animations: {
-      enabled: true,
-      easing: "easeinout",
-      speed: 800,
+    legend: {
+      show: false,
     },
-  },
-  stroke: {
-    curve: "smooth",
-    width: 3,
-    colors: ["#8A63F9"],
-  },
-  fill: {
-    type: "gradient",
-    gradient: {
-      shadeIntensity: 1,
-      opacityFrom: 0.4,
-      opacityTo: 0.05,
-      stops: [0, 100],
-      colorStops: [
-        {
-          offset: 0,
-          color: "#8A63F9",
-          opacity: 0.4,
+    markers: {
+      size: 5,
+      colors: ["#8A63F9"],
+      strokeColors: "#fff",
+      strokeWidth: 2,
+      hover: {
+        size: 7,
+      },
+    },
+    responsive: [
+      {
+        breakpoint: 768,
+        options: {
+          chart: {
+            height: 200,
+          },
+          yaxis: {
+            tickAmount: 3,
+          },
         },
-        {
-          offset: 100,
-          color: "#8A63F9",
-          opacity: 0.05,
-        },
-      ],
-    },
-  },
-  colors: ["#8A63F9"],
-  grid: {
-    borderColor: "#f1f1f1",
-    strokeDashArray: 0,
-    padding: {
-      top: 20,
-      right: 20,
-      bottom: 20,
-      left: 20,
-    },
-  },
-  xaxis: {
-    categories: [
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
+      },
     ],
-    axisBorder: {
-      show: false,
-    },
-    axisTicks: {
-      show: false,
-    },
-    labels: {
-      style: {
-        colors: "#6B7280",
-        fontSize: "12px",
-      },
-    },
-  },
-  yaxis: {
-    min: 0,
-    max: 8,
-    tickAmount: 8,
-    labels: {
-      style: {
-        colors: "#6B7280",
-        fontSize: "12px",
-      },
-      formatter: (value: number) => `${value}`,
-    },
-  },
-  tooltip: {
-    enabled: true,
-    style: {
-      fontSize: "12px",
-    },
-    y: {
-      formatter: (value: number) => `${value}`,
-    },
-    theme: "light",
-    fillSeriesColor: false,
-  },
-  dataLabels: {
-    enabled: false,
-  },
-  legend: {
-    show: false,
-  },
-  markers: {
-    size: 5,
-    colors: ["#8A63F9"],
-    strokeColors: "#fff",
-    strokeWidth: 2,
-    hover: {
-      size: 7,
-    },
-  },
-  responsive: [
-    {
-      breakpoint: 768,
-      options: {
-        chart: {
-          height: 200,
-        },
-        yaxis: {
-          tickAmount: 6,
-        },
-      },
-    },
-  ],
+  };
 });
 
-const chartSeries = ref([
-  {
-    name: "Project Progress",
-    data: [4, 3, 6, 2, 5, 3],
-  },
-]);
+const chartSeries = computed(() => {
+  return [
+    {
+      name: "Proyek Selesai",
+      data: projectStore.statistics?.chart_data?.series || [],
+    },
+  ];
+});
 </script>
 
 <template>

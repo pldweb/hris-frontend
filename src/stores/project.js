@@ -8,6 +8,10 @@ export const useProjectStore = defineStore("project", {
         statistics: {
             total: 0,
             active: 0,
+            chart_data: {
+                categories: [],
+                series: []
+            }
         },
         meta: {
             current_page: 1,

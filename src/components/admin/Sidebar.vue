@@ -67,7 +67,7 @@ const onNavigate = () => emit("navigate");
     </div>
 
     <!-- Navigation Menu -->
-    <nav class="px-6 py-4 space-y-6">
+    <nav class="flex-1 overflow-y-auto px-6 py-4 space-y-6 pb-20">
       <!-- GENERAL Section -->
       <div>
         <h3 class="section-title">UMUM</h3>
@@ -345,6 +345,30 @@ const onNavigate = () => emit("navigate");
       <div>
         <h3 class="section-title">LAINNYA</h3>
         <div class="space-y-3">
+          <RouterLink
+            :to="{ name: 'admin.roles' }"
+            class="nav-link border border-[#DCDEDD] rounded-[20px] hover:border-[#0C51D9] hover:border-2 focus:bg-white transition-all duration-300"
+            :class="{
+              'nav-link-active': $route.name?.startsWith('admin.roles'),
+            }"
+            v-if="can('role-menu') || can('role-list')"
+            @click="onNavigate"
+          >
+            <CrownIcon
+              class="w-5 h-5 text-gray-600"
+              :class="{
+                'text-white': $route.name?.startsWith('admin.roles'),
+              }"
+            />
+            <span
+              class="text-brand-dark text-base font-medium"
+              :class="{
+                'text-brand-white': $route.name?.startsWith('admin.roles'),
+              }"
+              >Manajemen Peran</span
+            >
+          </RouterLink>
+
           <a
             href="#"
             class="nav-link border border-[#DCDEDD] rounded-[20px] hover:border-[#0C51D9] hover:border-2 focus:bg-white transition-all duration-300"

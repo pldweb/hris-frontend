@@ -15,6 +15,7 @@ import EmployeeCreateLayout from '@/layouts/EmployeeCreateLayout.vue';
 import projectRoutes from './project';
 import attendanceRoutes from './attendance';
 import payrollRoutes from './payroll';
+import roleRoutes from './role';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -53,6 +54,7 @@ const router = createRouter({
         ...projectRoutes,
         ...attendanceRoutes,
         ...payrollRoutes,
+        ...roleRoutes,
         {
           path: 'my-profile',
           name: 'employee.profile',
@@ -120,6 +122,11 @@ const router = createRouter({
           path: 'login',
           name: 'login',
           component: Login,
+        },
+        {
+          path: 'register',
+          name: 'register',
+          component: () => import('@/views/auth/Register.vue'),
         },
       ],
     },

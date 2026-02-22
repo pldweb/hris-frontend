@@ -37,6 +37,23 @@ export const useAuthStore = defineStore("auth", {
             }
         },
 
+        async register(credentials) {
+            this.loading = true
+            this.error = null
+
+            try {
+                const response = await axiosInstance.post('/register', credentials)
+                const token = response.data.data.token
+                Cookies.set('token', token)
+                this.success = response.data.message
+                router.push({ name: 'admin.dashboard' })
+            } catch (error) {
+                this.error = handleError(error)
+            } finally {
+                this.loading = false
+            }
+        },
+
         async checkAuth() {
             this.loading = true;
             try {

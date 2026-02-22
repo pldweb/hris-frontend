@@ -11,9 +11,13 @@ const props = defineProps({
     type: [String, Number],
     required: true,
   },
+  task: {
+    type: Object,
+    default: null,
+  }
 });
 
-const emit = defineEmits(["close", "created"]);
+const emit = defineEmits(["close", "created", "updated"]);
 
 const formData = ref({
   name: "",
@@ -31,14 +35,25 @@ watch(
   () => props.isOpen,
   (isOpen) => {
     if (isOpen) {
-      formData.value = {
-        name: "",
-        description: "",
-        priority: "medium",
-        status: "todo",
-        due_date: "",
-        project_id: props.projectId,
-      };
+      if (props.task) {
+        formData.value = {
+          name: props.task.name || "",
+          description: props.task.description || "",
+          priority: props.task.priority || "medium",
+          status: props.task.status || "todo",
+          due_date: props.task.due_date ? props.task.due_date.split('T')[0] : "",
+          project_id: props.projectId,
+        };
+      } else {
+        formData.value = {
+          name: "",
+          description: "",
+          priority: "medium",
+          status: "todo",
+          due_date: "",
+          project_id: props.projectId,
+        };
+      }
     }
   }
 );
@@ -56,10 +71,14 @@ const handleSubmit = async () => {
   isSubmitting.value = true;
 
   try {
-    emit("created", { ...formData.value });
+    if (props.task) {
+        emit("updated", { id: props.task.id, ...formData.value });
+    } else {
+        emit("created", { ...formData.value });
+    }
     closeModal();
   } catch (error) {
-    console.error("Error creating task:", error);
+    console.error("Error saving task:", error);
   } finally {
     isSubmitting.value = false;
   }
@@ -88,7 +107,7 @@ const handleSubmit = async () => {
           <div
             class="flex items-center justify-between p-6 border-b border-gray-200"
           >
-            <h2 class="text-2xl font-bold text-gray-900">Create New Task</h2>
+            <h2 class="text-2xl font-bold text-gray-900">{{ props.task ? 'Edit Task' : 'Create New Task' }}</h2>
             <button
               @click="closeModal"
               class="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -187,7 +206,7 @@ const handleSubmit = async () => {
                 :disabled="isSubmitting"
                 class="px-6 py-3 bg-[#0C51D9] hover:bg-[#0a42b3] text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {{ isSubmitting ? "Creating..." : "Create Task" }}
+                {{ isSubmitting ? "Saving..." : (props.task ? "Update Task" : "Create Task") }}
               </button>
             </div>
           </form>

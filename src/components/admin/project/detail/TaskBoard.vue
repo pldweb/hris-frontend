@@ -7,7 +7,7 @@ import { storeToRefs } from "pinia";
 import { useRoute } from "vue-router";
 import TaskCard from "./TaskCard.vue";
 import TaskDetailModal from "./TaskDetailModal.vue";
-import TaskCreateModal from "./TaskCreateModal.vue";
+import TaskFormModal from "./TaskFormModal.vue";
 
 const route = useRoute();
 const taskStore = useTaskStore();
@@ -17,7 +17,8 @@ const { fetchProjectTasks, updateTaskStatus, createTask, deleteTask } = taskStor
 const searchQuery = ref("");
 const isModalOpen = ref(false);
 const selectedTaskId = ref(null);
-const isCreateModalOpen = ref(false);
+const isFormModalOpen = ref(false);
+const taskToEdit = ref(null);
 
 // Computed property to get always fresh task data from store
 const selectedTask = computed(() => {
@@ -35,20 +36,29 @@ const closeTaskDetail = () => {
   selectedTaskId.value = null;
 };
 
-const openCreateModal = () => {
-  isCreateModalOpen.value = true;
+const openFormModal = (task = null) => {
+  taskToEdit.value = task;
+  isFormModalOpen.value = true;
 };
 
-const closeCreateModal = () => {
-  isCreateModalOpen.value = false;
+const closeFormModal = () => {
+  isFormModalOpen.value = false;
+  taskToEdit.value = null;
 };
 
-const handleCreateTask = async (taskData) => {
+const handleSaveTask = async (taskData) => {
   try {
-    await createTask(taskData);
+    if (taskData.id) {
+      // is editing
+      const { id, ...updateData } = taskData;
+      await taskStore.updateTask(id, updateData);
+    } else {
+      // is creating
+      await createTask(taskData);
+    }
     await fetchProjectTasks(route.params.id);
   } catch (error) {
-    console.error("Failed to create task:", error);
+    console.error("Failed to save task:", error);
   }
 };
 
@@ -59,6 +69,11 @@ const handleDeleteTask = async (taskId) => {
   } catch (error) {
     console.error("Failed to delete task:", error);
   }
+};
+
+const handleEditFromDetail = (task) => {
+  closeTaskDetail();
+  openFormModal(task);
 };
 
 // Writable computed properties untuk drag and drop
@@ -138,7 +153,7 @@ onMounted(async () => {
         </div>
       </div>
       <button
-        @click="openCreateModal"
+        @click="openFormModal(null)"
         class="btn-primary rounded-[8px] border border-[#2151A0] hover:brightness-110 focus:ring-2 focus:ring-[#0C51D9] transition-all duration-300 blue-gradient blue-btn-shadow px-4 py-3 flex items-center gap-2"
       >
         <Plus class="w-4 h-4 text-white" />
@@ -289,14 +304,17 @@ onMounted(async () => {
       :project-id="parseInt(route.params.id)"
       @close="closeTaskDetail"
       @deleted="handleDeleteTask"
+      @edit="handleEditFromDetail"
     />
 
-    <!-- Task Create Modal -->
-    <TaskCreateModal
-      :is-open="isCreateModalOpen"
+    <!-- Task Form Modal -->
+    <TaskFormModal
+      :is-open="isFormModalOpen"
+      :task="taskToEdit"
       :project-id="route.params.id"
-      @close="closeCreateModal"
-      @created="handleCreateTask"
+      @close="closeFormModal"
+      @created="handleSaveTask"
+      @updated="handleSaveTask"
     />
   </div>
 </template>

@@ -21,11 +21,11 @@ export const formatRupiahCompact = (amount) => {
   const abs = Math.abs(n);
   const sign = n < 0 ? "-" : "";
   if (abs >= 1000000000) {
-    return `Rp ${sign}${(abs / 1000000000).toFixed(1)}B`;
+    return `Rp ${sign}${(abs / 1000000000).toFixed(1)}M`;
   } else if (abs >= 1000000) {
-    return `Rp ${sign}${(abs / 1000000).toFixed(1)}M`;
+    return `Rp ${sign}${(abs / 1000000).toFixed(1)}JT`;
   } else if (abs >= 1000) {
-    return `Rp ${sign}${(abs / 1000).toFixed(1)}K`;
+    return `Rp ${sign}${(abs / 1000).toFixed(1)}RB`;
   }
   return formatRupiah(n);
 };

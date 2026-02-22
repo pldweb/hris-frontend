@@ -37,7 +37,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["close", "deleted", "assigneeChanged", "updated"]);
+const emit = defineEmits(["close", "deleted", "assigneeChanged", "updated", "edit"]);
 
 const employeeStore = useEmployeeStore();
 const { employees } = storeToRefs(employeeStore);
@@ -47,6 +47,7 @@ const taskStore = useTaskStore();
 const { updateTask, fetchProjectTasks } = taskStore;
 
 const assigneeDropdown = ref(false);
+const statusDropdown = ref(false);
 const dueDateEditing = ref(false);
 const searchAssignee = ref("");
 const selectedAssignee = ref(null);
@@ -54,6 +55,10 @@ const editedDueDate = ref("");
 
 const closeModal = () => {
   emit("close");
+};
+
+const handleEdit = () => {
+    emit("edit", props.task);
 };
 
 const handleDelete = () => {
@@ -128,6 +133,27 @@ const handleUpdateDueDate = async () => {
   } catch (error) {
     console.error("Failed to update due date:", error);
     dueDateEditing.value = false;
+  }
+};
+
+const toggleStatusDropdown = () => {
+  statusDropdown.value = !statusDropdown.value;
+};
+
+const handleUpdateStatus = async (newStatus) => {
+  try {
+    await updateTask(props.task.id, {
+      status: newStatus,
+    });
+
+    // Fetch ulang data tasks
+    await fetchProjectTasks(props.projectId);
+
+    emit("updated");
+    statusDropdown.value = false;
+  } catch (error) {
+    console.error("Failed to update status:", error);
+    statusDropdown.value = false;
   }
 };
 
@@ -524,17 +550,47 @@ watch(
                   >
                     Actions
                   </h3>
-                  <div class="space-y-2">
+                  <div class="space-y-2 relative">
                     <button
+                      @click="handleEdit"
                       class="w-full px-4 py-2 bg-[#0C51D9] hover:bg-[#0a42b3] text-white rounded-lg text-sm font-medium transition-colors"
                     >
                       Edit Task
                     </button>
+                    
                     <button
-                      class="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors"
+                      @click="toggleStatusDropdown"
+                      class="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors flex items-center justify-between"
                     >
-                      Move to...
+                      <span>Move to...</span>
+                      <ChevronDown
+                        class="w-4 h-4 text-gray-400 transition-transform duration-200"
+                        :class="{ 'rotate-180': statusDropdown }"
+                      />
                     </button>
+
+                    <!-- Status Dropdown Menu -->
+                    <div
+                      v-if="statusDropdown"
+                      class="absolute top-16 left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-10 overflow-hidden flex flex-col"
+                    >
+                      <button
+                        v-for="(label, value) in {
+                          todo: 'To Do',
+                          in_progress: 'In Progress',
+                          review: 'Review',
+                          done: 'Done'
+                        }"
+                        :key="value"
+                        type="button"
+                        @click="handleUpdateStatus(value)"
+                        class="w-full px-4 py-2 hover:bg-gray-50 transition-colors text-left text-sm font-medium text-gray-700 capitalize flex items-center justify-between"
+                      >
+                         <span>{{ label }}</span>
+                         <Check v-if="task.status === value" class="w-4 h-4 text-[#0C51D9]" />
+                      </button>
+                    </div>
+
                     <button
                       @click="handleDelete"
                       class="w-full px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-sm font-medium transition-colors"
